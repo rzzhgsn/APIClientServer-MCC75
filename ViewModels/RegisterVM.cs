@@ -40,9 +40,5 @@ public class RegisterVM
    
 }
 
-public enum GenderEnum
-{
-    Male,
-    Female
-}
+
 

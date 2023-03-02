@@ -7,13 +7,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace API.Repositories.Data; 
 
-public class AccountRepository : GeneralRepository<int, Account>
+public class AccountRepository : GeneralRepository<string, Account>
 {
     private readonly MyContext context;
+    private readonly EmployeeRepository employeeRepository;
 
     public AccountRepository(MyContext context) : base(context)
     {
         this.context = context;
+        this.employeeRepository = employeeRepository;
     }
 
     public async Task<int> Register(RegisterVM registerVM)
@@ -53,7 +55,7 @@ public class AccountRepository : GeneralRepository<int, Account>
             FirstName = registerVM.FirstName,
             LastName = registerVM.LastName,
             Birthdate = registerVM.BirthDate,
-            Gender = (Employee.GenderEnum)registerVM.Gender,
+            Gender = registerVM.Gender,
             HiringDate = registerVM.HiringDate,
             Email = registerVM.Email,
             PhoneNumber = registerVM.PhoneNumber,
@@ -105,5 +107,34 @@ public class AccountRepository : GeneralRepository<int, Account>
         }
 
         return Hashing.ValidatePassword(loginVM.Password, getAccounts.Password);
+    }
+
+    public UserdataVM GetUserdata(string email)
+    {
+        var userdata = (from e in context.Employees
+                        join a in context.Accounts
+                        on e.NIK equals a.EmployeeNIK
+                        join ar in context.AccountRoles
+                        on a.EmployeeNIK equals ar.AccountNIK
+                        join r in context.Roles
+                        on ar.RoleId equals r.Id
+                        where e.Email == email
+                        select new UserdataVM
+                        {
+                            Email = e.Email,
+                            FullName = String.Concat(e.FirstName, " ", e.LastName),
+                            Role = r.Name
+                        }).FirstOrDefault();
+
+        return userdata;
+    }
+    public List<string> GetRolesByNIK(string email)
+    {
+        var getNIK = context.Employees.FirstOrDefault(e => e.Email == email);
+        return context.AccountRoles.Where(ar => ar.AccountNIK == getNIK.NIK).Join(
+            context.Roles,
+            ar => ar.RoleId,
+            r => r.Id,
+            (ar, r) => r.Name).ToList();
     }
 }

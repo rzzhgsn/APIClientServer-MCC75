@@ -4,6 +4,10 @@ using API.Repositories.Interface;
 using MCC75_MVC.ViewModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace API.Controllers;
 
@@ -12,10 +16,12 @@ namespace API.Controllers;
 public class AccountController : ControllerBase
 {
     private readonly AccountRepository accountrepository;
+    private readonly IConfiguration configuration;
 
-    public AccountController(AccountRepository accountrepository)
+    public AccountController(AccountRepository accountrepository, IConfiguration configuration)
     {
         this.accountrepository = accountrepository;
+        this.configuration = configuration;
     }
 
     [HttpPost("Register")]
@@ -40,17 +46,44 @@ public class AccountController : ControllerBase
         try
         {
             var result = await accountrepository.Login(loginVM);
-            return result is false
-                ? Conflict(new
+            if ( result is false)
+                {
+                return Conflict(new
                 {
                     statusCode = 409,
                     message = "Account or Password  Does not Match!"
-                })
-                : Ok(new
-                {
-                    statusCode = 200,
-                    essage = "Login Success!"
                 });
+            }
+            else
+            {
+                var userdata = accountrepository.GetUserdata(loginVM.Email);
+                var roles = accountrepository.GetRolesByNIK(loginVM.Email);
+
+                var claims = new List<Claim>()
+            {
+                new Claim(ClaimTypes.Email, userdata.Email),
+                new Claim(ClaimTypes.Name, userdata.FullName)
+            };
+
+                foreach (var item in roles)
+                {
+                    claims.Add(new Claim(ClaimTypes.Role, item));
+                }
+
+                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["JWT:Key"]));
+                var signIn = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+                var token = new JwtSecurityToken(
+                    issuer: configuration["JWT:Issuer"],
+                    audience: configuration["JWT:Audience"],
+                    claims: claims,
+                    expires: DateTime.Now.AddMinutes(10),
+                    signingCredentials: signIn
+                    );
+
+                var generateToken = new JwtSecurityTokenHandler().WriteToken(token);
+
+                return Ok(new { statusCode = 200, message = "Login Success!", data = generateToken });
+            }
         }
         catch
         {

@@ -14,8 +14,8 @@ public class UniversityRepository : GeneralRepository<int, University>
         this.context = context;
     }
 
-    public async Task<IEnumerable<University>> GetUniversityByName(string name)
+    /*public async Task<IEnumerable<University>> GetUniversityByName(string name)
     {
         return await context.Universities.Where(u=> u.Name == name).ToListAsync();
-    }
+    }*/
 }
